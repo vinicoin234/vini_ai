@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  frontend:
+    image: nginx:alpine
+    container_name: vini-frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - vini-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  backend:
+    image: node:20-alpine
+    container_name: vini-backend
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+    ports:
+      - "3000:3000"
+    environment:
+      - API_KEYS=${API_KEYS:-demo-key-123}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-tinyllama}
+      - OLLAMA_URL=http://ollama:11434/api/generate
+      - PORT=3000
+      - NODE_ENV=production
+      - MONGODB_URI=${MONGODB_URI}
+    command: sh -c "npm install && npm start"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - vini-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: vini-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_KEEP_ALIVE=30m
+    restart: unless-stopped
+    networks:
+      - vini-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 6G
+        reservations:
+          memory: 4G
+
+networks:
+  vini-network:
+    driver: bridge
+
+volumes:
+  ollama-data:
+    driver: local

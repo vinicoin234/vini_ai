@@ -1,0 +1,14 @@
+.DS_Store
+node_modules/
+*.log
+.env
+.env.local
+dist/
+build/
+.git/
+.gitignore
+*.tmp
+ollama-data/
+.vscode/
+.idea/
+*.iml
